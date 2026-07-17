@@ -17,9 +17,15 @@ from datetime import date, timedelta
 from pathlib import Path
 from botocore.exceptions import ClientError, NoCredentialsError
 
+try:
+    from config import AWS_BUCKET as CONFIG_BUCKET, AWS_REGION as CONFIG_REGION
+except Exception:
+    CONFIG_BUCKET = None
+    CONFIG_REGION = None
+
 # ─── Configuración ────────────────────────────────────────────────────────────
-BUCKET      = "datos-dps"
-REGION      = "us-east-2"
+BUCKET = CONFIG_BUCKET or "datos-dps"
+REGION = CONFIG_REGION or "us-east-2"
 CARPETA_DESTINO = Path(r"C:\procesos\ReporteCanal13\datos")
 
 # Patrón de carpetas dentro del bucket: YYYY-MM-DD/
