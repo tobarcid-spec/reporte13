@@ -6,15 +6,22 @@ Uso:
     python descargar_s3.py 2026-04-01 2026-04-30   # rango por argumento
 
 Requiere:
-    pip install boto3
+    pip install boto3 openpyxl requests
     AWS configurado: aws configure  (o variables AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+
+Si un archivo descargado tiene el Total de Plays en 0, se dispara un reproceso en
+Mango (mango.digitalproserver.com/test_canal13.php?day=DD-MM-YYYY), se espera y se
+vuelve a descargar. Si sigue en 0, se reporta al final y el archivo no se conserva.
 """
 
 import sys
 import re
+import time
 import boto3
+import requests
 from datetime import date, timedelta
 from pathlib import Path
+from openpyxl import load_workbook
 from botocore.exceptions import ClientError, NoCredentialsError
 
 try:
@@ -27,6 +34,10 @@ except Exception:
 BUCKET = CONFIG_BUCKET or "datos-dps"
 REGION = CONFIG_REGION or "us-east-2"
 CARPETA_DESTINO = Path(r"C:\procesos\ReporteCanal13\datos")
+
+# Reproceso en Mango para días con el archivo en 0 (total de Plays vacío)
+MANGO_REPROCESO_URL = "https://mango.digitalproserver.com/test_canal13.php"
+MANGO_ESPERA_SEGUNDOS = 20
 
 # Patrón de carpetas dentro del bucket: YYYY-MM-DD/
 PATRON_CARPETA = re.compile(r"^(\d{4}-\d{2}-\d{2})/$")
@@ -48,6 +59,34 @@ def fechas_en_rango(desde: date, hasta: date):
     while d <= hasta:
         yield d
         d += timedelta(days=1)
+
+
+def total_plays(ruta: Path):
+    """Lee la fila 'Total' del archivo y retorna el valor de Plays (None si no se pudo leer)."""
+    try:
+        wb = load_workbook(ruta, read_only=True, data_only=True)
+        ws = wb.active
+        for fila in ws.iter_rows(min_row=2, values_only=True):
+            titulo = fila[2] if len(fila) > 2 else None
+            plays = fila[3] if len(fila) > 3 else None
+            if titulo and str(titulo).strip().lower() == "total":
+                wb.close()
+                return float(plays) if plays is not None else 0.0
+        wb.close()
+    except Exception:
+        return None
+    return None
+
+
+def reprocesar_mango(fecha: date) -> bool:
+    """Dispara el reproceso en Mango para el día indicado."""
+    url = f"{MANGO_REPROCESO_URL}?day={fecha.strftime('%d-%m-%Y')}"
+    try:
+        r = requests.get(url, timeout=60)
+        return r.status_code == 200
+    except requests.RequestException as e:
+        print(f" ERROR al reprocesar: {e}")
+        return False
 
 
 def descargar_rango(desde: date, hasta: date):
@@ -87,6 +126,7 @@ def descargar_rango(desde: date, hasta: date):
     descargados = 0
     omitidos    = 0
     errores     = 0
+    vacios      = []
 
     for fecha_str, prefix in carpetas_encontradas:
         # Listar archivos dentro de la carpeta
@@ -116,13 +156,43 @@ def descargar_rango(desde: date, hasta: date):
                 print(f"  [{fecha_str}] Descargando {nombre_archivo}...", end=" ", flush=True)
                 s3.download_file(BUCKET, key, str(destino))
                 print("OK")
-                descargados += 1
             except ClientError as e:
                 print(f"ERROR: {e}")
                 errores += 1
+                continue
 
-    print(f"\nResumen: {descargados} descargados, {omitidos} omitidos, {errores} errores.")
+            total = total_plays(destino)
+
+            if total == 0:
+                print(f"  [{fecha_str}] Total en 0 — reprocesando en Mango...", end=" ", flush=True)
+                fecha_dt = date.fromisoformat(fecha_str)
+                if reprocesar_mango(fecha_dt):
+                    print(f"OK, esperando {MANGO_ESPERA_SEGUNDOS}s...")
+                    time.sleep(MANGO_ESPERA_SEGUNDOS)
+                    try:
+                        s3.download_file(BUCKET, key, str(destino))
+                        total = total_plays(destino)
+                    except ClientError as e:
+                        print(f"  [{fecha_str}] ERROR al re-descargar: {e}")
+                        errores += 1
+                        continue
+                else:
+                    print("falló la solicitud de reproceso")
+
+            if total == 0:
+                print(f"  [{fecha_str}] Sigue en 0 tras reprocesar — no se guarda archivo vacío")
+                destino.unlink(missing_ok=True)
+                vacios.append(fecha_str)
+                continue
+
+            descargados += 1
+
+    print(f"\nResumen: {descargados} descargados, {omitidos} omitidos, {errores} errores, {len(vacios)} vacíos.")
     print(f"Destino: {CARPETA_DESTINO}")
+    if vacios:
+        print("\n⚠️  Días con Total en 0 incluso tras reprocesar (no se descargaron):")
+        for f in vacios:
+            print(f"  - {f}")
 
 
 def main():
