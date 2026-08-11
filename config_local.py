@@ -109,9 +109,21 @@ PROGRAMAS_CONFIG = {
         "playlist_youtube": "PLnDONcPxnlq0Q4S9NJnWq9pcWC1MXXaYp",
     },
 
+    # "El Clan React" y "Socios por Chile React" comparten la misma playlist de YouTube.
+    # Se distinguen por filtro_titulo. El video se sube un día después de emitirse en TV,
+    # por eso dia_fijo remapea la fecha al día real de emisión (0=Lunes ... 6=Domingo).
     "El Clan React": {
         "patrones_s3": None,
         "playlist_youtube": "PLnDONcPxnlq3aD54zvbw9fGmxQO63DjBc",
+        "filtro_titulo": r"El Clan",
+        "dia_fijo": 5,  # Sábado
+    },
+
+    "Socios por Chile React": {
+        "patrones_s3": None,
+        "playlist_youtube": "PLnDONcPxnlq3aD54zvbw9fGmxQO63DjBc",
+        "filtro_titulo": r"Socios por Chile",
+        "dia_fijo": 6,  # Domingo
     },
 
     "T13 en Vivo": {

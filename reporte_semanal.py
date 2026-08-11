@@ -162,30 +162,49 @@ def utc_a_fecha_chile(pub_utc):
     except Exception:
         return pub_utc[:10]
 
-def obtener_views_playlist_por_dia(yt, playlist_id, fecha_ini, fecha_fin):
-    """Obtiene views por video usando la fecha real de publicación del video (no la de la playlist)"""
-    # Paso 1: recolectar todos los video_ids de la playlist
-    todos_video_ids = []
+def fecha_dia_fijo_anterior(fecha_str, dia_fijo):
+    """Retorna la fecha del dia_fijo (0=Lunes...6=Domingo) más reciente, anterior o igual a fecha_str."""
+    dt = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    diff = (dt.weekday() - dia_fijo) % 7
+    return (dt - timedelta(days=diff)).strftime("%Y-%m-%d")
+
+
+def obtener_views_playlist_por_dia(yt, playlist_id, fecha_ini, fecha_fin, filtro_titulo=None, dia_fijo=None):
+    """Obtiene views por video usando la fecha real de publicación del video (no la de la playlist).
+
+    filtro_titulo: regex opcional — solo se cuentan videos cuyo título matchea (útil cuando
+                   varios programas comparten una misma playlist).
+    dia_fijo:      0=Lunes...6=Domingo opcional — remapea la fecha de publicación al día fijo
+                   real de emisión, para programas cuyo react se sube un día después en YouTube.
+    """
+    patron = re.compile(filtro_titulo, re.IGNORECASE) if filtro_titulo else None
+
+    # Paso 1: recolectar todos los video_ids (y títulos) de la playlist
+    todos_videos = []
     page_token = None
     try:
         while True:
             resp = yt.playlistItems().list(part="snippet", playlistId=playlist_id, maxResults=50, pageToken=page_token).execute()
             for item in resp.get("items", []):
-                video_id = item.get("snippet", {}).get("resourceId", {}).get("videoId")
-                if video_id:
-                    todos_video_ids.append(video_id)
+                snippet = item.get("snippet", {})
+                video_id = snippet.get("resourceId", {}).get("videoId")
+                titulo_video = snippet.get("title", "")
+                if video_id and (not patron or patron.search(titulo_video)):
+                    todos_videos.append(video_id)
             page_token = resp.get("nextPageToken")
             if not page_token:
                 break
 
         # Paso 2: obtener snippet+statistics de cada video para usar fecha real de publicación
         videos_por_fecha = {}
-        for i in range(0, len(todos_video_ids), 50):
-            chunk = todos_video_ids[i:i+50]
+        for i in range(0, len(todos_videos), 50):
+            chunk = todos_videos[i:i+50]
             resp = yt.videos().list(part="snippet,statistics", id=",".join(chunk)).execute()
             for item in resp.get("items", []):
                 pub_utc = item.get("snippet", {}).get("publishedAt", "")
                 publicado = utc_a_fecha_chile(pub_utc)
+                if dia_fijo is not None and publicado:
+                    publicado = fecha_dia_fijo_anterior(publicado, dia_fijo)
                 if fecha_ini <= publicado <= fecha_fin:
                     views = int(item["statistics"].get("viewCount", 0))
                     videos_por_fecha[publicado] = videos_por_fecha.get(publicado, 0) + views
@@ -210,10 +229,12 @@ def obtener_datos_youtube(fechas):
             if not playlist_raw:
                 continue
             playlists = playlist_raw if isinstance(playlist_raw, list) else [playlist_raw]
+            filtro_titulo = cfg.get("filtro_titulo")
+            dia_fijo = cfg.get("dia_fijo")
             print(f"   🎥 {prog}...", end="")
             views_por_dia = {}
             for pl_id in playlists:
-                for fecha, views in obtener_views_playlist_por_dia(yt, pl_id, fecha_ini, fecha_fin).items():
+                for fecha, views in obtener_views_playlist_por_dia(yt, pl_id, fecha_ini, fecha_fin, filtro_titulo, dia_fijo).items():
                     views_por_dia[fecha] = views_por_dia.get(fecha, 0) + views
             if views_por_dia:
                 views_total = sum(views_por_dia.values())
