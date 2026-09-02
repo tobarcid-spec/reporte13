@@ -141,4 +141,16 @@ PROGRAMAS_CONFIG = {
         "playlist_youtube": "PLnDONcPxnlq23hL0qoAm45AILXZzzxVP-",
     },
 
+    "Te Cuento Todo": {
+        "patrones_s3": [r"^TE\s+CUENTO\s+TODO$"],
+        "playlist_youtube": "PLMB2psPeunE4",
+        "hora_corte": 6,  # se sube de madrugada (~03-04 AM Chile) al día siguiente de la emisión
+    },
+
+    "Jet Set": {
+        "patrones_s3": [r"^JET\s+SET$"],
+        "playlist_youtube": "PLRrtFqi6kkvI",
+        "hora_corte": 6,  # a veces se sube de madrugada al día siguiente, a veces el mismo día
+    },
+
 }

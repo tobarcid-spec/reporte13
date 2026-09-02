@@ -152,13 +152,19 @@ def obtener_datos_s3(fechas, filepaths, programas):
 
 TZ_CHILE = timezone(timedelta(hours=-4))
 
-def utc_a_fecha_chile(pub_utc):
-    """Convierte publishedAt de YouTube (UTC) a fecha local Chile (UTC-4)"""
+def utc_a_fecha_chile(pub_utc, hora_corte=None):
+    """Convierte publishedAt de YouTube (UTC) a fecha local Chile (UTC-4).
+
+    hora_corte: hora opcional (0-23) — si el video se publica antes de esa hora local,
+                se atribuye al día anterior. Útil para programas cuyo video se sube en la
+                madrugada del día siguiente a la emisión real."""
     if not pub_utc:
         return ""
     try:
-        dt = datetime.fromisoformat(pub_utc.replace("Z", "+00:00"))
-        return dt.astimezone(TZ_CHILE).strftime("%Y-%m-%d")
+        dt_local = datetime.fromisoformat(pub_utc.replace("Z", "+00:00")).astimezone(TZ_CHILE)
+        if hora_corte is not None and dt_local.hour < hora_corte:
+            dt_local -= timedelta(days=1)
+        return dt_local.strftime("%Y-%m-%d")
     except Exception:
         return pub_utc[:10]
 
@@ -169,13 +175,15 @@ def fecha_dia_fijo_anterior(fecha_str, dia_fijo):
     return (dt - timedelta(days=diff)).strftime("%Y-%m-%d")
 
 
-def obtener_views_playlist_por_dia(yt, playlist_id, fecha_ini, fecha_fin, filtro_titulo=None, dia_fijo=None):
+def obtener_views_playlist_por_dia(yt, playlist_id, fecha_ini, fecha_fin, filtro_titulo=None, dia_fijo=None, hora_corte=None):
     """Obtiene views por video usando la fecha real de publicación del video (no la de la playlist).
 
     filtro_titulo: regex opcional — solo se cuentan videos cuyo título matchea (útil cuando
                    varios programas comparten una misma playlist).
     dia_fijo:      0=Lunes...6=Domingo opcional — remapea la fecha de publicación al día fijo
                    real de emisión, para programas cuyo react se sube un día después en YouTube.
+    hora_corte:    hora opcional (0-23) — videos publicados antes de esa hora local se cuentan
+                   como del día anterior (programas subidos de madrugada al día siguiente).
     """
     patron = re.compile(filtro_titulo, re.IGNORECASE) if filtro_titulo else None
 
@@ -202,7 +210,7 @@ def obtener_views_playlist_por_dia(yt, playlist_id, fecha_ini, fecha_fin, filtro
             resp = yt.videos().list(part="snippet,statistics", id=",".join(chunk)).execute()
             for item in resp.get("items", []):
                 pub_utc = item.get("snippet", {}).get("publishedAt", "")
-                publicado = utc_a_fecha_chile(pub_utc)
+                publicado = utc_a_fecha_chile(pub_utc, hora_corte)
                 if dia_fijo is not None and publicado:
                     publicado = fecha_dia_fijo_anterior(publicado, dia_fijo)
                 if fecha_ini <= publicado <= fecha_fin:
@@ -231,10 +239,11 @@ def obtener_datos_youtube(fechas):
             playlists = playlist_raw if isinstance(playlist_raw, list) else [playlist_raw]
             filtro_titulo = cfg.get("filtro_titulo")
             dia_fijo = cfg.get("dia_fijo")
+            hora_corte = cfg.get("hora_corte")
             print(f"   🎥 {prog}...", end="")
             views_por_dia = {}
             for pl_id in playlists:
-                for fecha, views in obtener_views_playlist_por_dia(yt, pl_id, fecha_ini, fecha_fin, filtro_titulo, dia_fijo).items():
+                for fecha, views in obtener_views_playlist_por_dia(yt, pl_id, fecha_ini, fecha_fin, filtro_titulo, dia_fijo, hora_corte).items():
                     views_por_dia[fecha] = views_por_dia.get(fecha, 0) + views
             if views_por_dia:
                 views_total = sum(views_por_dia.values())
