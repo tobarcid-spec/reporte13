@@ -14,11 +14,15 @@ Mango (mango.digitalproserver.com/test_canal13.php?day=DD-MM-YYYY), se espera y 
 vuelve a descargar. Si sigue en 0, se reporta al final y el archivo no se conserva.
 """
 
-import sys
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 import re
 import time
 import boto3
 import requests
+import pandas as pd
 from datetime import date, timedelta
 from pathlib import Path
 from openpyxl import load_workbook
@@ -87,6 +91,65 @@ def reprocesar_mango(fecha: date) -> bool:
     except requests.RequestException as e:
         print(f" ERROR al reprocesar: {e}")
         return False
+
+
+def normalizar_3x3(desde: date, hasta: date):
+    """Corrige '3 X 3' en los archivos ya descargados en CARPETA_DESTINO:
+
+    1. Cada mañana, S3 entrega el bloque real (~59-60 min) de "3 X 3" dentro del archivo
+       del día ANTERIOR, con la columna Inicial fechada para el día siguiente (porque el
+       'día de transmisión' de cada archivo va de las 06:00 a las 06:00 del día después).
+       Ese bloque se traslada al archivo cuya fecha coincide con su Inicial real.
+    2. Además suele quedar un fragmento residual de 1 minuto (mismo título, sin contenido
+       real) en el archivo del día siguiente — se elimina, dejando solo el bloque real.
+
+    Se amplía el rango un día a cada lado para poder enlazar con archivos de descargas
+    anteriores/posteriores ya presentes en disco; los archivos que no existen se ignoran.
+    """
+    fechas = [str(f) for f in fechas_en_rango(desde - timedelta(days=1), hasta + timedelta(days=1))]
+    dfs = {}
+    for f in fechas:
+        ruta = CARPETA_DESTINO / f"{f}_programacion.xlsx"
+        if ruta.exists():
+            dfs[f] = pd.read_excel(ruta)
+
+    if not dfs:
+        return
+
+    tocados = set()
+
+    # Paso 1: eliminar fragmentos residuales de "3 X 3" (duración <= 2 minutos)
+    for f, df in dfs.items():
+        tcol = df.columns[2]
+        es_3x3 = df[tcol].astype(str).str.upper().str.replace(" ", "", regex=False) == "3X3"
+        dur_min = (pd.to_datetime(df["Final"]) - pd.to_datetime(df["Inicial"])).dt.total_seconds() / 60
+        mask = es_3x3 & (dur_min <= 2)
+        if mask.any():
+            dfs[f] = df[~mask].reset_index(drop=True)
+            tocados.add(f)
+
+    # Paso 2: mover el bloque real fechado para el día siguiente al archivo correcto
+    for i in range(len(fechas) - 1):
+        f, f_sig = fechas[i], fechas[i + 1]
+        if f not in dfs or f_sig not in dfs:
+            continue
+        df = dfs[f]
+        tcol = df.columns[2]
+        es_3x3 = df[tcol].astype(str).str.upper().str.replace(" ", "", regex=False) == "3X3"
+        fecha_dia = date.fromisoformat(f)
+        inicial_dt = pd.to_datetime(df["Inicial"], errors="coerce")
+        mask = es_3x3 & (inicial_dt.dt.date != fecha_dia)
+        moviendo = df[mask]
+        if len(moviendo):
+            dfs[f] = df[~mask].reset_index(drop=True)
+            dfs[f_sig] = pd.concat([moviendo, dfs[f_sig]], ignore_index=True)
+            tocados.update([f, f_sig])
+
+    for f in tocados:
+        dfs[f].to_excel(CARPETA_DESTINO / f"{f}_programacion.xlsx", index=False)
+
+    if tocados:
+        print(f"\n🔧 Normalización '3 X 3': {len(tocados)} archivo(s) corregido(s) ({', '.join(sorted(tocados))})")
 
 
 def descargar_rango(desde: date, hasta: date):
@@ -186,6 +249,8 @@ def descargar_rango(desde: date, hasta: date):
                 continue
 
             descargados += 1
+
+    normalizar_3x3(desde, hasta)
 
     print(f"\nResumen: {descargados} descargados, {omitidos} omitidos, {errores} errores, {len(vacios)} vacíos.")
     print(f"Destino: {CARPETA_DESTINO}")
