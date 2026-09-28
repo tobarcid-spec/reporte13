@@ -126,6 +126,12 @@ PROGRAMAS_CONFIG = {
         "dia_fijo": 6,  # Domingo
     },
 
+    "Lugares que Hablan React": {
+        "patrones_s3": None,
+        "playlist_youtube": "PLbD9fWEEf7yk",
+        "dia_fijo": 5,  # Sábado
+    },
+
     "T13 en Vivo": {
         "patrones_s3": [r"^T13\s+EN\s+VIVO$"],
         "playlist_youtube": None,
