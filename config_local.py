@@ -82,6 +82,12 @@ PROGRAMAS_CONFIG = {
         "playlist_youtube": "PLnDONcPxnlq0yjE--VHMb8HxwUwoz1ILe",
     },
 
+    # Alfombra Roja reemplazó a Hay que Decirlo desde el 05-oct-2026.
+    "Alfombra Roja": {
+        "patrones_s3": [r"^ALFOMBRA\s+ROJA$"],
+        "playlist_youtube": "PLCFSo6sb233Q",
+    },
+
     "Hay que Decirlo (R)": {
         "patrones_s3": [r"HAY\s+QUE\s+DECIRLO\s*\(R\)"],
         "playlist_youtube": None,
