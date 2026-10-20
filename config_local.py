@@ -132,6 +132,22 @@ PROGRAMAS_CONFIG = {
         "dia_fijo": 6,  # Domingo
     },
 
+    # "React Vértigo" y "React Vértigo Extremo" comparten la misma playlist de YouTube
+    # (mezclada con clips normales de Vértigo). Se distinguen por filtro_titulo.
+    "React Vértigo": {
+        "patrones_s3": None,
+        "playlist_youtube": "PLDUU9rBWj5YA",
+        "filtro_titulo": r"react de las amikas",
+        "dia_fijo": 3,  # Jueves
+    },
+
+    "React Vértigo Extremo": {
+        "patrones_s3": None,
+        "playlist_youtube": "PLDUU9rBWj5YA",
+        "filtro_titulo": r"react de mati vega",
+        "dia_fijo": 0,  # Lunes
+    },
+
     "Lugares que Hablan React": {
         "patrones_s3": None,
         "playlist_youtube": "PLbD9fWEEf7yk",
