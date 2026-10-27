@@ -74,12 +74,12 @@ PROGRAMAS_CONFIG = {
 
     "La Tarde es Nuestra": {
         "patrones_s3": [r"^LA\s+TARDE\s+ES\s+NUESTRA$"],
-        "playlist_youtube": "PLnDONcPxnlq3ijFAfv9O1nQP4ub46eUGc",
+        "playlist_youtube": None,
     },
 
     "Hay que Decirlo": {
         "patrones_s3": [r"^HAY\s+QUE\s+DECIRLO$"],
-        "playlist_youtube": "PLnDONcPxnlq0yjE--VHMb8HxwUwoz1ILe",
+        "playlist_youtube": None,
     },
 
     # Alfombra Roja reemplazó a Hay que Decirlo desde el 05-oct-2026.
