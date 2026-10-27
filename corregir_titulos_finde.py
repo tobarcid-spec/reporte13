@@ -43,6 +43,7 @@ PATRONES_GENERICOS = [
     re.compile(r"^CULTURA\s*13", re.IGNORECASE),
     re.compile(r"^S[AÁ]BADOS?\s+DE\s+PEL[IÍ]CULAS?", re.IGNORECASE),
     re.compile(r"^DOMINGOS?\s+DE\s+PEL[IÍ]CULAS?", re.IGNORECASE),
+    re.compile(r"^TRAVES[IÍ]A\s*13\s*C?\s*$", re.IGNORECASE),
 ]
 
 
@@ -79,7 +80,12 @@ def parsear_horario(ruta_txt: str, fecha_base: str):
 
 
 def buscar_programa_real(horario, momento):
-    """Retorna el programa de 'horario' cuyo inicio es el más reciente <= momento (floor match)."""
+    """Retorna el programa de 'horario' cuyo inicio es el más reciente <= momento (floor match).
+
+    Si 'momento' es anterior a toda la grilla (por redondeos de 1-2 min entre el
+    horario real y el archivo C13), se usa la primera entrada de la grilla."""
+    if momento < horario[0][0] and (horario[0][0] - momento) <= timedelta(minutes=5):
+        return horario[0][1]
     candidato = None
     for dt, programa in horario:
         if dt <= momento:
