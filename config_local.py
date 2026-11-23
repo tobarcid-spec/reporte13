@@ -132,6 +132,15 @@ PROGRAMAS_CONFIG = {
         "dia_fijo": 6,  # Domingo
     },
 
+    # Socios por el Mundo Temporada 5 — playlist propia, mezclada con capítulos completos.
+    # filtro_titulo se queda solo con los videos "React".
+    "Socios por el Mundo React": {
+        "patrones_s3": None,
+        "playlist_youtube": "PLD9JndzOUccw",
+        "filtro_titulo": r"React\s+Socios\s+por\s+el\s+Mundo",
+        "dia_fijo": 6,  # Domingo
+    },
+
     # "React Vértigo" y "React Vértigo Extremo" comparten la misma playlist de YouTube
     # (mezclada con clips normales de Vértigo). Se distinguen por filtro_titulo.
     "React Vértigo": {
@@ -143,7 +152,7 @@ PROGRAMAS_CONFIG = {
 
     "React Vértigo Extremo": {
         "patrones_s3": None,
-        "playlist_youtube": "PLDUU9rBWj5YA",
+        "playlist_youtube": "PLSyrGo3nfICw",
         "filtro_titulo": r"react de mati vega",
         "dia_fijo": 0,  # Lunes
     },
