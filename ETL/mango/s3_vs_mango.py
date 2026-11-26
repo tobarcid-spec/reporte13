@@ -116,8 +116,14 @@ def buscar_programa_en_s3(desde: date, hasta: date, termino: str):
             if not col_titulo or not col_plays:
                 continue
 
-            mask = df[col_titulo].astype(str).str.upper().str.contains(termino_upper, na=False, regex=False)
+            titulos_norm = df[col_titulo].astype(str).str.upper().str.strip()
+            mask = titulos_norm == termino_upper
             filas = df[mask]
+
+            if filas.empty:
+                # Fallback: si no hay coincidencia exacta, usar substring (compatibilidad)
+                mask = titulos_norm.str.contains(termino_upper, na=False, regex=False)
+                filas = df[mask]
 
             if filas.empty:
                 print(f"  ⚠️  {f}: programa no encontrado")
